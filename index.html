@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electricity Bill Calculator</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b7285">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+    color: #1a1a1a;
+  }
+  .card {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  h1 { font-size: 1.4rem; margin-top: 0; color: #0b7285; }
+  label { display: block; margin-top: 12px; font-size: 0.9rem; font-weight: 600; }
+  input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+  .meter-row { display: flex; gap: 10px; }
+  .meter-row > div { flex: 1; }
+  button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    background: #0b7285;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:active { background: #095c6b; }
+  #meters { margin-top: 8px; }
+  .meter-block {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+  #result {
+    margin-top: 18px;
+    padding: 14px;
+    background: #e6f7f9;
+    border-radius: 8px;
+    display: none;
+  }
+  #result.error { background: #fdecea; color: #b42318; }
+  .bill-line { display: flex; justify-content: space-between; padding: 4px 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚡ Electricity Bill Calculator</h1>
+
+    <label for="amount">Total Bill Amount (Taka)</label>
+    <input type="number" id="amount" min="0" step="0.01" placeholder="e.g. 3500">
+
+    <label for="meterCount">Number of Meters</label>
+    <input type="number" id="meterCount" min="1" step="1" value="1">
+
+    <div id="meters"></div>
+
+    <button id="calcBtn">Calculate Bill</button>
+
+    <div id="result"></div>
+  </div>
+
+<script>
+const meterCountInput = document.getElementById('meterCount');
+const metersDiv = document.getElementById('meters');
+const resultDiv = document.getElementById('result');
+
+function renderMeterInputs() {
+  const n = Math.max(1, parseInt(meterCountInput.value) || 1);
+  metersDiv.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const block = document.createElement('div');
+    block.className = 'meter-block';
+    block.innerHTML = `
+      <label>Meter ${i + 1}</label>
+      <div class="meter-row">
+        <div>
+          <label style="font-weight:400;">Current Unit</label>
+          <input type="number" min="0" step="1" class="curr" data-i="${i}">
+        </div>
+        <div>
+          <label style="font-weight:400;">Previous Unit</label>
+          <input type="number" min="0" step="1" class="prev" data-i="${i}">
+        </div>
+      </div>
+    `;
+    metersDiv.appendChild(block);
+  }
+}
+
+meterCountInput.addEventListener('input', renderMeterInputs);
+renderMeterInputs();
+
+document.getElementById('calcBtn').addEventListener('click', () => {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const currs = [...document.querySelectorAll('.curr')].map(el => parseFloat(el.value));
+  const prevs = [...document.querySelectorAll('.prev')].map(el => parseFloat(el.value));
+
+  if (isNaN(amount) || currs.some(isNaN) || prevs.some(isNaN)) {
+    resultDiv.className = 'error';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = 'Please fill in all fields.';
+    return;
+  }
+
+  const totalUnits = currs.map((c, i) => c - prevs[i]);
+  const sumUnits = totalUnits.reduce((a, b) => a + b, 0);
+
+  if (totalUnits.some(u => u < 0)) {
+    resultDiv.className = 'error';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = 'Current unit must not be less than previous unit.';
+    return;
+  }
+  if (sumUnits <= 0) {
+    resultDiv.className = 'error';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = 'Total units must be greater than 0.';
+    return;
+  }
+
+  const avgPrice = amount / sumUnits;
+  let html = `<div class="bill-line"><strong>Total units</strong><span>${sumUnits}</span></div>`;
+  html += `<div class="bill-line"><strong>Avg unit price</strong><span>${avgPrice.toFixed(4)} Tk</span></div>`;
+  html += '<hr>';
+  totalUnits.forEach((u, i) => {
+    const bill = avgPrice * u;
+    html += `<div class="bill-line"><span>Meter ${i + 1} (${u} units)</span><strong>Tk ${bill.toFixed(2)}</strong></div>`;
+  });
+
+  resultDiv.className = '';
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = html;
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
